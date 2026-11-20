@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs'),p=require('path'),cp=require('child_process');let s='';try{s=process.stdin.isTTY?'':fs.readFileSync(0,'utf8')}catch{}let c='';try{const j=JSON.parse(s);if(j&&typeof j.cwd==='string')c=j.cwd}catch{}let f='';for(const b of [process.env.CLAUDE_PROJECT_DIR,c,process.cwd()].filter(Boolean)){for(let d=p.resolve(b);;){const t=p.join(d,'.seedup','hook.mjs');if(fs.existsSync(t)){f=t;break}const u=p.dirname(d);if(u===d)break;d=u}if(f)break}if(f){process.exit(cp.spawnSync(process.execPath,[f,'session-start'],{input:s,stdio:['pipe','inherit','inherit']}).status??0)}else{console.log('Seedup 훅 파일(.seedup/hook.mjs)이 없습니다. Seedup에서 훅 묶음을 다시 받으세요.')}\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs'),p=require('path'),cp=require('child_process');let s='';try{s=process.stdin.isTTY?'':fs.readFileSync(0,'utf8')}catch{}let c='';try{const j=JSON.parse(s);if(j&&typeof j.cwd==='string')c=j.cwd}catch{}let f='';for(const b of [process.env.CLAUDE_PROJECT_DIR,c,process.cwd()].filter(Boolean)){for(let d=p.resolve(b);;){const t=p.join(d,'.seedup','hook.mjs');if(fs.existsSync(t)){f=t;break}const u=p.dirname(d);if(u===d)break;d=u}if(f)break}if(f){process.exit(cp.spawnSync(process.execPath,[f,'pre-compact','--summary'],{input:s,stdio:['pipe','inherit','inherit']}).status??0)}\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs'),p=require('path'),cp=require('child_process');let s='';try{s=process.stdin.isTTY?'':fs.readFileSync(0,'utf8')}catch{}let c='';try{const j=JSON.parse(s);if(j&&typeof j.cwd==='string')c=j.cwd}catch{}let f='';for(const b of [process.env.CLAUDE_PROJECT_DIR,c,process.cwd()].filter(Boolean)){for(let d=p.resolve(b);;){const t=p.join(d,'.seedup','hook.mjs');if(fs.existsSync(t)){f=t;break}const u=p.dirname(d);if(u===d)break;d=u}if(f)break}if(f){process.exit(cp.spawnSync(process.execPath,[f,'stop'],{input:s,stdio:['pipe','inherit','inherit']}).status??0)}\""
+          }
+        ]
+      }
+    ]
+  }
+}
