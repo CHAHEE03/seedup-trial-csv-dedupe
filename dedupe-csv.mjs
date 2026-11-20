@@ -43,7 +43,12 @@ export function dedupe({ header, rows }, { keys, trim = false, ignoreCase = fals
   const warnings = [];
   const seen = new Set(), kept = [], removed = [];
   rows.forEach((row, i) => {
-    if (header && row.length !== header.length) warnings.push(`line ${i + 2}: expected ${header.length} columns, got ${row.length}`);
+    // A row with the wrong column count is warned about and always kept in place, never judged a duplicate.
+    if (header && row.length !== header.length) {
+      warnings.push(`line ${i + 2}: expected ${header.length} columns, got ${row.length}`);
+      kept.push(row);
+      return;
+    }
     const values = (columns ?? row.map((_, c) => c)).map((c) => {
       let v = row[c] ?? '';
       if (trim) v = v.trim();

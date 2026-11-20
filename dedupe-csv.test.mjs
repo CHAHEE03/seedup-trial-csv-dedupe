@@ -51,6 +51,13 @@ test('F-01: a row with the wrong column count warns and stays in order', () => {
   assert.equal(r.output, 'a,b\n1,2\n3\n4,5\n');
 });
 
+test('F-01: repeated rows with the wrong column count are never removed', () => {
+  const r = run('a,b\n3\n3\n1,2\n1,2\n');
+  assert.equal(r.output, 'a,b\n3\n3\n1,2\n');
+  assert.equal(r.stdout, 'removed: 1\nkept: 3\n');
+  assert.equal(r.stderr.match(/expected 2 columns/g).length, 2);
+});
+
 test('F-01: unclosed quote exits 2 with the line number', () => {
   const r = run('a,b\n1,"open\n');
   assert.equal(r.code, 2);
