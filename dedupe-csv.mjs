@@ -11,8 +11,11 @@ export class UsageError extends Error {}
 // F-01: one pass over the whole text, so quoted delimiters and line breaks stay inside their value.
 export function parseCsv(text, delimiter = ',', hasHeader = true) {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-  const rows = [];
-  let row = [], value = '', quoted = false, line = 1, quoteLine = 0;
+  // The output keeps the input's line ending and final newline, so a file without duplicates comes back unchanged.
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const finalNewline = text === '' || /\r?\n$/.test(text);
+  const rows = [], lines = [];
+  let row = [], value = '', quoted = false, line = 1, rowLine = 1, quoteLine = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (quoted) {
@@ -23,17 +26,19 @@ export function parseCsv(text, delimiter = ',', hasHeader = true) {
     else if (ch === delimiter) { row.push(value); value = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
-      row.push(value); rows.push(row); row = []; value = ''; line++;
+      row.push(value); rows.push(row); lines.push(rowLine); row = []; value = ''; line++; rowLine = line;
     } else value += ch;
   }
   if (quoted) throw new UsageError(`line ${quoteLine}: unclosed quote`);
-  if (value !== '' || row.length) { row.push(value); rows.push(row); }
-  const data = rows.filter((r) => r.some((v) => v !== '')); // all-empty lines are ignored (decision for F-02)
-  return hasHeader ? { header: data[0] ?? null, rows: data.slice(1), delimiter } : { header: null, rows: data, delimiter };
+  if (value !== '' || row.length) { row.push(value); rows.push(row); lines.push(rowLine); }
+  // All-empty lines are ignored (decision for F-02); every kept row remembers its line in the source file.
+  const data = rows.map((r, i) => ({ r, line: lines[i] })).filter(({ r }) => r.some((v) => v !== ''));
+  const body = hasHeader ? data.slice(1) : data;
+  return { header: hasHeader ? data[0]?.r ?? null : null, rows: body.map((d) => d.r), lines: body.map((d) => d.line), delimiter, eol, finalNewline };
 }
 
 // F-02: the first row of each key stays; the key uses only the chosen columns, normalised only for comparison.
-export function dedupe({ header, rows }, { keys, trim = false, ignoreCase = false } = {}) {
+export function dedupe({ header, rows, lines }, { keys, trim = false, ignoreCase = false } = {}) {
   const width = header?.length ?? Math.max(0, ...rows.map((r) => r.length));
   const columns = keys?.length ? keys.map((key) => {
     const index = /^\d+$/.test(key) ? Number(key) - 1 : header ? header.indexOf(key) : -1;
@@ -45,7 +50,7 @@ export function dedupe({ header, rows }, { keys, trim = false, ignoreCase = fals
   rows.forEach((row, i) => {
     // A row with the wrong column count is warned about and always kept in place, never judged a duplicate.
     if (header && row.length !== header.length) {
-      warnings.push(`line ${i + 2}: expected ${header.length} columns, got ${row.length}`);
+      warnings.push(`line ${lines?.[i] ?? i + 2}: expected ${header.length} columns, got ${row.length}`);
       kept.push(row);
       return;
     }
@@ -63,7 +68,10 @@ export function dedupe({ header, rows }, { keys, trim = false, ignoreCase = fals
 }
 
 const quote = (value, delimiter) => (/["\r\n]/.test(value) || value.includes(delimiter) ? `"${value.replace(/"/g, '""')}"` : value);
-export const toCsv = (header, rows, delimiter = ',') => [...(header ? [header] : []), ...rows].map((r) => r.map((v) => quote(v, delimiter)).join(delimiter)).join('\n') + '\n';
+export const toCsv = (header, rows, delimiter = ',', eol = '\n', finalNewline = true) => {
+  const all = [...(header ? [header] : []), ...rows];
+  return all.map((r) => r.map((v) => quote(v, delimiter)).join(delimiter)).join(eol) + (finalNewline && all.length ? eol : '');
+};
 
 // F-03: never write over the input; the default output sits next to it.
 export function outputPath(input, out) {
@@ -116,7 +124,7 @@ export function main(argv, io = process) {
   for (const warning of result.warnings) io.stderr.write(`${warning}\n`);
   try {
     mkdirSync(dirname(options.target), { recursive: true });
-    writeFileSync(options.target, toCsv(parsed.header, result.keptRows, options.delimiter));
+    writeFileSync(options.target, toCsv(parsed.header, result.keptRows, options.delimiter, parsed.eol, parsed.finalNewline));
   } catch (error) { io.stderr.write(`cannot write ${options.target}: ${error.code ?? error.message}\n`); return 1; }
   io.stdout.write(summary(result.removedRows, result.keptRows));
   return 0;

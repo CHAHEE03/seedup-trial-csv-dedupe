@@ -86,6 +86,27 @@ test('F-02: --trim and --ignore-case change only the comparison', () => {
   assert.equal(run('a\nKim\nkim\n', ['--ignore-case']).output, 'a\nKim\n');
 });
 
+test('F-02: --keys, --trim and --ignore-case combined', () => {
+  const input = 'email,name\n Kim@x.com ,a\nkim@x.com,b\nlee@x.com,c\n';
+  assert.equal(run(input, ['--keys', 'email', '--trim']).stdout, 'removed: 0\nkept: 3\n');
+  assert.equal(run(input, ['--keys', 'email', '--ignore-case']).stdout, 'removed: 0\nkept: 3\n');
+  const both = run(input, ['--keys', 'email', '--trim', '--ignore-case']);
+  assert.equal(both.output, 'email,name\n Kim@x.com ,a\nlee@x.com,c\n');
+  assert.equal(both.stdout, 'removed: 1\nkept: 2\n');
+  assert.equal(run('a,b\n X,1\nx,2\n', ['--keys', '1', '--trim', '--ignore-case']).stdout, 'removed: 1\nkept: 1\n');
+});
+
+test('F-01: warnings name the line in the source file even after empty lines', () => {
+  const r = run('a,b\n\n1,2\n\n3\n');
+  assert.match(r.stderr, /^line 5: expected 2 columns, got 1$/m);
+});
+
+test('F-04: without duplicates the output equals the input (CRLF and no final newline kept)', () => {
+  assert.equal(run('a,b\r\n1,2\r\n3,4\r\n').output, 'a,b\r\n1,2\r\n3,4\r\n');
+  assert.equal(run('a,b\n1,2').output, 'a,b\n1,2');
+  assert.equal(run('a,b\r\n1,2\r\n1,2\r\n').output, 'a,b\r\n1,2\r\n');
+});
+
 test('F-02: all-empty lines are ignored', () => {
   assert.equal(run('a,b\n1,2\n\n,\n1,2\n').stdout, 'removed: 1\nkept: 1\n');
 });
